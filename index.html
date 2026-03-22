@@ -128,145 +128,137 @@
   </div>
 </div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-  const correctPin = "21196";
+const correctPin = "21196";
 
-  function checkPin() {
-    const userPin = document.getElementById("pinInput").value;
-    if(userPin === correctPin) {
-      document.getElementById("pinPrompt").style.display = "none";
-      document.getElementById("mainContent").style.display = "block";
-      alert("Access granted!");
-    } else {
-      alert("Wrong PIN! Access denied.");
-    }
+function checkPin() {
+  const userPin = document.getElementById("pinInput").value;
+  if(userPin === correctPin) {
+    document.getElementById("pinPrompt").style.display = "none";
+    document.getElementById("mainContent").style.display = "block";
+    alert("Access granted!");
+  } else {
+    alert("Wrong PIN! Access denied.");
   }
+}
 
-  // Map and tile layers
-  const map = L.map('map').setView([41.8781, -87.6298], 10); // Default Chicago
+// Leaflet Map Setup
+const map = L.map('map').setView([41.8781, -87.6298], 10);
 
-  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map);
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap'
+}).addTo(map);
 
-  const watercolor = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg', {
-    attribution: 'Map tiles by Stamen Design'
-  });
+const watercolor = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg', {
+  attribution: 'Map tiles by Stamen Design'
+});
 
-  const layers = { osm, watercolor };
+const layers = { osm, watercolor };
 
-  document.getElementById('mapThemeSelect').onchange = function() {
-    for (const key in layers) map.removeLayer(layers[key]);
-    const selected = this.value;
-    layers[selected].addTo(map);
-  }
+document.getElementById('mapThemeSelect').onchange = function() {
+  for (const key in layers) map.removeLayer(layers[key]);
+  layers[this.value].addTo(map);
+};
 
-  let marker;
-  let currentLat, currentLon;
-  let searchHistory = [];
+let marker;
+let currentLat, currentLon;
+let searchHistory = [];
 
-  const houseIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png',
-    iconSize: [30, 30]
-  });
+const houseIcon = L.icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png',
+  iconSize: [30, 30]
+});
 
-  async function searchAddress() {
-    const addressInput = document.getElementById('address').value;
-    if (!addressInput) return;
+async function searchAddress() {
+  const addressInput = document.getElementById('address').value;
+  if (!addressInput) return;
 
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(addressInput)}`
-      );
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(addressInput)}`);
+    const data = await res.json();
 
-      const data = await res.json();
-
-      if (data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lon = parseFloat(data[0].lon);
-        currentLat = lat;
-        currentLon = lon;
-
-        const addressDetails = data[0].address;
-
-        let fullAddress = "";
-        if (addressDetails.road) fullAddress += addressDetails.road + ", ";
-        if (addressDetails.city) fullAddress += addressDetails.city + ", ";
-        if (addressDetails.county) fullAddress += addressDetails.county + ", ";
-        if (addressDetails.state) fullAddress += addressDetails.state + ", ";
-        if (addressDetails.postcode) fullAddress += addressDetails.postcode + ", ";
-        if (addressDetails.country) fullAddress += addressDetails.country;
-
-        if (marker) map.removeLayer(marker);
-
-        marker = L.marker([lat, lon], { icon: houseIcon }).addTo(map)
-          .bindPopup(fullAddress)
-          .openPopup();
-
-        map.flyTo([lat, lon], 15, { duration: 2 });
-
-        const streetViewUrl = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=11,0,0,0,0&output=svembed`;
-        document.getElementById("streetview").src = streetViewUrl;
-
-        document.getElementById("coords").innerText = `Latitude: ${lat}, Longitude: ${lon}`;
-
-        const localTime = new Date().toLocaleTimeString("en-US", { timeZone: "America/Chicago" });
-        document.getElementById("localTime").innerText = `Local Time (demo timezone): ${localTime}`;
-
-        const table = document.getElementById("addressDetails");
-        table.innerHTML = `
-          <tr><td>Road:</td><td>${addressDetails.road || "-"}</td></tr>
-          <tr><td>City:</td><td>${addressDetails.city || "-"}</td></tr>
-          <tr><td>County:</td><td>${addressDetails.county || "-"}</td></tr>
-          <tr><td>State:</td><td>${addressDetails.state || "-"}</td></tr>
-          <tr><td>Postcode:</td><td>${addressDetails.postcode || "-"}</td></tr>
-          <tr><td>Country:</td><td>${addressDetails.country || "-"}</td></tr>
-        `;
-
-        searchHistory.unshift({lat, lon, fullAddress});
-        if (searchHistory.length > 5) searchHistory.pop();
-        updateHistory();
-
-      } else {
-        alert("Address not found");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error searching address");
-    }
-  }
-
-  function updateHistory() {
-    const list = document.getElementById("history");
-    list.innerHTML = "";
-    searchHistory.forEach((item) => {
-      const li = document.createElement("li");
-      li.textContent = item.fullAddress;
-      li.onclick = () => {
-        currentLat = item.lat;
-        currentLon = item.lon;
-        marker.setLatLng([item.lat, item.lon]);
-        map.flyTo([item.lat, item.lon], 15, { duration: 2 });
-        const streetViewUrl = `https://www.google.com/maps?q=&layer=c&cbll=${item.lat},${item.lon}&cbp=11,0,0,0,0&output=svembed`;
-        document.getElementById("streetview").src = streetViewUrl;
-        document.getElementById("coords").innerText = `Latitude: ${item.lat}, Longitude: ${item.lon}`;
-      };
-      list.appendChild(li);
-    });
-  }
-
-  document.getElementById("directionsBtn").onclick = () => {
-    if (!currentLat || !currentLon) {
-      alert("Search for an address first!");
+    if (data.length === 0) {
+      alert("Address not found");
       return;
     }
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${currentLat},${currentLon}`;
-    window.open(url, "_blank");
-  }
 
+    const lat = parseFloat(data[0].lat);
+    const lon = parseFloat(data[0].lon);
+    currentLat = lat;
+    currentLon = lon;
+
+    const addressDetails = data[0].address;
+
+    let fullAddress = "";
+    if (addressDetails.road) fullAddress += addressDetails.road + ", ";
+    if (addressDetails.city) fullAddress += addressDetails.city + ", ";
+    if (addressDetails.county) fullAddress += addressDetails.county + ", ";
+    if (addressDetails.state) fullAddress += addressDetails.state + ", ";
+    if (addressDetails.postcode) fullAddress += addressDetails.postcode + ", ";
+    if (addressDetails.country) fullAddress += addressDetails.country;
+
+    if (marker) map.removeLayer(marker);
+
+    marker = L.marker([lat, lon], { icon: houseIcon }).addTo(map)
+      .bindPopup(fullAddress)
+      .openPopup();
+
+    map.flyTo([lat, lon], 15, { duration: 2 });
+
+    document.getElementById("streetview").src = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=11,0,0,0,0&output=svembed`;
+
+    document.getElementById("coords").innerText = `Latitude: ${lat}, Longitude: ${lon}`;
+
+    const localTime = new Date().toLocaleTimeString("en-US", { timeZone: "America/Chicago" });
+    document.getElementById("localTime").innerText = `Local Time (demo timezone): ${localTime}`;
+
+    const table = document.getElementById("addressDetails");
+    table.innerHTML = `
+      <tr><td>Road:</td><td>${addressDetails.road || "-"}</td></tr>
+      <tr><td>City:</td><td>${addressDetails.city || "-"}</td></tr>
+      <tr><td>County:</td><td>${addressDetails.county || "-"}</td></tr>
+      <tr><td>State:</td><td>${addressDetails.state || "-"}</td></tr>
+      <tr><td>Postcode:</td><td>${addressDetails.postcode || "-"}</td></tr>
+      <tr><td>Country:</td><td>${addressDetails.country || "-"}</td></tr>
+    `;
+
+    searchHistory.unshift({lat, lon, fullAddress});
+    if (searchHistory.length > 5) searchHistory.pop();
+    updateHistory();
+
+  } catch(err) {
+    console.error(err);
+    alert("Error searching address");
+  }
+}
+
+function updateHistory() {
+  const list = document.getElementById("history");
+  list.innerHTML = "";
+  searchHistory.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item.fullAddress;
+    li.onclick = () => {
+      currentLat = item.lat;
+      currentLon = item.lon;
+      marker.setLatLng([item.lat, item.lon]);
+      map.flyTo([item.lat, item.lon], 15, { duration: 2 });
+      document.getElementById("streetview").src = `https://www.google.com/maps?q=&layer=c&cbll=${item.lat},${item.lon}&cbp=11,0,0,0,0&output=svembed`;
+      document.getElementById("coords").innerText = `Latitude: ${item.lat}, Longitude: ${item.lon}`;
+    };
+    list.appendChild(li);
+  });
+}
+
+document.getElementById("directionsBtn").onclick = () => {
+  if (!currentLat || !currentLon) {
+    alert("Search for an address first!");
+    return;
+  }
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${currentLat},${currentLon}`;
+  window.open(url, "_blank");
+};
 </script>
 
 </body>
