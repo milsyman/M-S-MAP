@@ -1,163 +1,143 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Fun Map + Street View + Info</title>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <meta charset="UTF-8">
+  <title>M&S CHAT</title>
   <style>
-    body { font-family: Arial; margin:0; padding:10px; text-align:center; }
-    #container { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
-    #map, #streetview { border-radius:10px; }
-    #map { height:500px; width:48%; }
-    #streetview { height:500px; width:48%; border:none; }
-    #info { margin-top:10px; text-align:left; width:100%; }
-    table { margin:10px auto; border-collapse:collapse; }
-    table, th, td { border:1px solid #ccc; padding:5px 10px; }
-    input { padding:8px; width:250px; }
-    button { padding:8px 12px; cursor:pointer; margin-left:5px; }
-    #history { margin-top:10px; max-width:500px; margin:auto; }
-    #history li { cursor:pointer; color:blue; text-decoration:underline; margin-bottom:3px; }
-    #themeSwitcher { margin-top:5px; }
-    @media(max-width:900px) { #map,#streetview { width:100%; height:400px; } }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #6a11cb, #2575fc);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h2 { text-shadow: 1px 1px 5px #000; }
+    input { padding: 10px; border-radius: 5px; border: none; margin: 5px 0; width: 250px; }
+    button { padding: 10px 20px; border: none; border-radius: 5px; background-color: #ff4081; color: white; cursor: pointer; font-weight: bold; transition: 0.3s; }
+    button:hover { background-color: #f50057; }
+    ul { list-style: none; padding: 0; width: 100%; max-width: 500px; margin-top: 20px; }
+    li { background: rgba(0,0,0,0.3); padding: 10px; margin: 5px 0; border-radius: 8px; word-wrap: break-word; }
+    .disabled { opacity: 0.5; cursor: not-allowed; }
+    #chatContainer { display: none; flex-direction: column; align-items: center; width: 100%; }
   </style>
 </head>
 <body>
+  <h2>DRIVERS CHAT</h2>
 
-<h2>Fun Map + Street View + Info</h2>
+  <!-- PIN input -->
+  <input id="pinInput" placeholder="Enter PIN to access chat">
+  <button id="pinBtn">Enter</button>
 
-<div id="pinPrompt">
-  <p>Please enter the PIN to access the map:</p>
-  <input type="password" id="pinInput" placeholder="Enter PIN" />
-  <button onclick="checkPin()">Submit</button>
-</div>
-
-<div id="mainContent" style="display:none;">
-  <input type="text" id="address" placeholder="Enter address..." />
-  <button onclick="searchAddress()">Go</button>
-  <button id="directionsBtn">Get Directions</button>
-
-  <div id="themeSwitcher">
-    Map Theme: 
-    <select id="mapThemeSelect">
-      <option value="osm">OpenStreetMap</option>
-      <option value="watercolor">Watercolor</option>
-    </select>
+  <!-- Chat container (hidden initially) -->
+  <div id="chatContainer">
+    <input id="message" placeholder="Type your message here" disabled><br>
+    <button id="sendBtn" class="disabled" disabled>Send</button>
+    <ul id="messages"></ul>
   </div>
 
-  <div id="container">
-    <div id="map"></div>
-    <iframe id="streetview"></iframe>
-  </div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js";
 
-  <div id="info">
-    <p id="coords"></p>
-    <p id="localTime"></p>
-    <table id="addressDetails"></table>
-    <h4>Search History (click to jump back)</h4>
-    <ul id="history"></ul>
-  </div>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-let correctPin = "21196";
-let map, marker;
-let currentLat, currentLon;
-let searchHistory = [];
-
-function checkPin() {
-  const userPin = document.getElementById("pinInput").value;
-  if(userPin === correctPin){
-    document.getElementById("pinPrompt").style.display = "none";
-    document.getElementById("mainContent").style.display = "block";
-    alert("Access granted!");
-    initMap(); // Initialize Leaflet only after content is visible
-  } else {
-    alert("Wrong PIN! Access denied.");
-  }
-}
-
-function initMap(){
-  map = L.map('map').setView([41.8781, -87.6298], 10);
-
-  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
-  const watercolor = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg', { attribution:'Map tiles by Stamen Design' });
-
-  const layers = { osm, watercolor };
-  document.getElementById('mapThemeSelect').onchange = function() {
-    for (const key in layers) map.removeLayer(layers[key]);
-    layers[this.value].addTo(map);
-  };
-}
-
-async function searchAddress(){
-  const addressInput = document.getElementById('address').value;
-  if(!addressInput) return alert("Please enter an address");
-
-  try{
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(addressInput)}`);
-    const data = await res.json();
-    if(!data || data.length === 0) return alert("Address not found");
-
-    const lat = parseFloat(data[0].lat);
-    const lon = parseFloat(data[0].lon);
-    currentLat = lat; currentLon = lon;
-
-    const addr = data[0].address;
-    let fullAddress = `${addr.road||""} ${addr.city||""} ${addr.county||""} ${addr.state||""} ${addr.postcode||""} ${addr.country||""}`;
-
-    if(marker) map.removeLayer(marker);
-    marker = L.marker([lat,lon]).addTo(map).bindPopup(fullAddress).openPopup();
-    map.flyTo([lat,lon],15,{duration:2});
-
-    document.getElementById("streetview").src = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lon}&cbp=11,0,0,0,0&output=svembed`;
-    document.getElementById("coords").innerText = `Latitude: ${lat}, Longitude: ${lon}`;
-    document.getElementById("localTime").innerText = `Local Time: ${new Date().toLocaleTimeString("en-US",{timeZone:"America/Chicago"})}`;
-
-    document.getElementById("addressDetails").innerHTML = `
-      <tr><td>Road</td><td>${addr.road||"-"}</td></tr>
-      <tr><td>City</td><td>${addr.city||"-"}</td></tr>
-      <tr><td>County</td><td>${addr.county||"-"}</td></tr>
-      <tr><td>State</td><td>${addr.state||"-"}</td></tr>
-      <tr><td>Postcode</td><td>${addr.postcode||"-"}</td></tr>
-      <tr><td>Country</td><td>${addr.country||"-"}</td></tr>
-    `;
-
-    searchHistory.unshift({lat,lon,fullAddress});
-    if(searchHistory.length>5) searchHistory.pop();
-    updateHistory();
-
-  } catch(err){
-    console.error(err);
-    alert("Error searching address. Try again.");
-  }
-}
-
-function updateHistory(){
-  const list = document.getElementById("history");
-  list.innerHTML="";
-  searchHistory.forEach(item=>{
-    const li = document.createElement("li");
-    li.textContent = item.fullAddress;
-    li.onclick = ()=>{
-      currentLat=item.lat; currentLon=item.lon;
-      marker.setLatLng([item.lat,item.lon]);
-      map.flyTo([item.lat,item.lon],15,{duration:2});
-      document.getElementById("streetview").src = `https://www.google.com/maps?q=&layer=c&cbll=${item.lat},${item.lon}&cbp=11,0,0,0,0&output=svembed`;
-      document.getElementById("coords").innerText = `Latitude: ${item.lat}, Longitude: ${item.lon}`;
+    const firebaseConfig = {
+      apiKey: "AIzaSyC4RwUjxX9x118vXdlfr6UEZGC0rwL6-HE",
+      authDomain: "chat-1cb54.firebaseapp.com",
+      databaseURL: "https://chat-1cb54-default-rtdb.firebaseio.com/",
+      projectId: "chat-1cb54",
+      storageBucket: "chat-1cb54.firebasestorage.app",
+      messagingSenderId: "353414353280",
+      appId: "1:353414353280:web:e1c5c865ce0abfd9c0b165",
+      measurementId: "G-1CNP83WJKZ"
     };
-    list.appendChild(li);
-  });
-}
 
-document.getElementById("directionsBtn").onclick = ()=>{
-  if(!currentLat || !currentLon) return alert("Search for an address first!");
-  window.open(`https://www.google.com/maps/dir/?api=1&destination=${currentLat},${currentLon}`,"_blank");
-};
-</script>
+    const app = initializeApp(firebaseConfig);
+    getAnalytics(app);
+    const db = getDatabase(app);
+    const messagesRef = ref(db, 'messages');
 
+    const pinInput = document.getElementById("pinInput");
+    const pinBtn = document.getElementById("pinBtn");
+    const chatContainer = document.getElementById("chatContainer");
+    const messageInput = document.getElementById("message");
+    const sendBtn = document.getElementById("sendBtn");
+
+    let currentAddress = null;
+    const CORRECT_PIN = "21196";
+
+    // PIN verification
+    pinBtn.addEventListener('click', () => {
+      if(pinInput.value === CORRECT_PIN){
+        alert("PIN correct! Access granted.");
+        pinInput.style.display = "none";
+        pinBtn.style.display = "none";
+        chatContainer.style.display = "flex";
+        messageInput.disabled = false;
+        if(currentAddress){
+          sendBtn.disabled = false;
+          sendBtn.classList.remove('disabled');
+        }
+      } else {
+        alert("Incorrect PIN. Access denied.");
+      }
+    });
+
+    // Geolocation
+    if(navigator.geolocation){
+      navigator.geolocation.watchPosition(position => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+          .then(res => res.json())
+          .then(data => {
+            currentAddress = data.display_name || null;
+            if(currentAddress && messageInput.disabled === false){
+              sendBtn.disabled = false;
+              sendBtn.classList.remove('disabled');
+            }
+          })
+          .catch(() => {
+            currentAddress = null;
+            sendBtn.disabled = true;
+            sendBtn.classList.add('disabled');
+          });
+      }, () => {
+        alert("Location permission is required to post messages.");
+        sendBtn.disabled = true;
+        sendBtn.classList.add('disabled');
+      });
+    }
+
+    // Send message
+    sendBtn.addEventListener('click', () => {
+      const msg = messageInput.value.trim();
+      if(!currentAddress){ alert("Location not ready"); return; }
+      if(!msg){ alert("Cannot send empty message"); return; }
+
+      push(messagesRef, {
+        message: msg,
+        location: currentAddress
+      }).then(() => {
+        messageInput.value = "";
+      }).catch(err => {
+        console.error("Error sending message:", err);
+        alert("Failed to send message. Check console.");
+      });
+    });
+
+    // Listen for messages
+    onChildAdded(messagesRef, snapshot => {
+      const data = snapshot.val();
+      const li = document.createElement("li");
+      let text = "";
+      if(data.message) text += data.message + " | ";
+      if(data.location) text += "📍 " + data.location;
+      li.textContent = text;
+      document.getElementById("messages").appendChild(li);
+    });
+  </script>
 </body>
 </html>
