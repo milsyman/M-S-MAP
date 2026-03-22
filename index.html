@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Fun Map + Street View + Info</title>
+  <title>Map View</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -91,19 +91,11 @@
 </head>
 <body>
 
-<h2>Fun Map + Street View + Info</h2>
+<h2>Map View</h2>
 
 <input type="text" id="address" placeholder="Enter address..." />
 <button onclick="searchAddress()">Go</button>
 <button id="directionsBtn">Get Directions</button>
-
-<div id="themeSwitcher">
-  Map Theme: 
-  <select id="mapThemeSelect">
-    <option value="osm">OpenStreetMap</option>
-    <option value="watercolor">Watercolor</option>
-  </select>
-</div>
 
 <div id="container">
   <div id="map"></div>
