@@ -1,156 +1,24 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Fun Map + Street View + Info</title>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
-  <style>
-    body {
-      font-family: Arial;
-      margin: 0;
-      padding: 10px;
-      text-align: center;
-    }
-
-    #container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    #map {
-      height: 500px;
-      width: 48%;
-      border-radius: 10px;
-    }
-
-    #streetview {
-      height: 500px;
-      width: 48%;
-      border-radius: 10px;
-      border: none;
-    }
-
-    #info {
-      margin-top: 10px;
-      text-align: left;
-      width: 100%;
-    }
-
-    table {
-      margin: 10px auto;
-      border-collapse: collapse;
-    }
-
-    table, th, td {
-      border: 1px solid #ccc;
-      padding: 5px 10px;
-    }
-
-    input {
-      padding: 8px;
-      width: 250px;
-    }
-
-    button {
-      padding: 8px 12px;
-      cursor: pointer;
-      margin-left: 5px;
-    }
-
-    #history {
-      margin-top: 10px;
-      max-width: 500px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    #history li {
-      cursor: pointer;
-      color: blue;
-      text-decoration: underline;
-      margin-bottom: 3px;
-    }
-
-    #themeSwitcher {
-      margin-top: 5px;
-    }
-
-    @media(max-width: 900px) {
-      #map, #streetview {
-        width: 100%;
-        height: 400px;
-      }
-    }
-  </style>
-</head>
-<body>
-
-<h2>Fun Map + Street View + Info</h2>
-
-<input type="text" id="address" placeholder="Enter address..." />
-<button onclick="searchAddress()">Go</button>
-<button id="directionsBtn">Get Directions</button>
-
-<div id="themeSwitcher">
-  Map Theme: 
-  <select id="mapThemeSelect">
-    <option value="osm">OpenStreetMap</option>
-    <option value="watercolor">Watercolor</option>
-  </select>
-</div>
-
-<div id="container">
-  <div id="map"></div>
-  <iframe id="streetview"></iframe>
-</div>
-
-<div id="info">
-  <p id="coords"></p>
-  <p id="localTime"></p>
-  <table id="addressDetails"></table>
-  <h4>Search History (click to jump back)</h4>
-  <ul id="history"></ul>
-</div>
-
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-  // Map and tile layers
-  const map = L.map('map').setView([41.8781, -87.6298], 10); // Default Chicago
+  const correctPin = "21196";
+  let accessGranted = false;
 
-  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map);
-
-  const watercolor = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg', {
-    attribution: 'Map tiles by Stamen Design'
-  });
-
-  const layers = { osm, watercolor };
-
-  document.getElementById('mapThemeSelect').onchange = function() {
-    for (const key in layers) map.removeLayer(layers[key]);
-    const selected = this.value;
-    layers[selected].addTo(map);
-  }
-
-  let marker;
-  let currentLat, currentLon;
-  let searchHistory = [];
-
-  const houseIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/25/25694.png',
-    iconSize: [30, 30]
-  });
+  // Prompt for PIN on page load
+  window.onload = function() {
+    const userPin = prompt("Enter PIN to access the map:");
+    if (userPin === correctPin) {
+      accessGranted = true;
+      alert("Access granted!");
+    } else {
+      alert("Wrong PIN! You cannot use the map.");
+    }
+  };
 
   async function searchAddress() {
+    if (!accessGranted) {
+      alert("You must enter the correct PIN first.");
+      return;
+    }
+
     const addressInput = document.getElementById('address').value;
     if (!addressInput) return;
 
@@ -222,28 +90,12 @@
     }
   }
 
-  // Update search history list
-  function updateHistory() {
-    const list = document.getElementById("history");
-    list.innerHTML = "";
-    searchHistory.forEach((item, idx) => {
-      const li = document.createElement("li");
-      li.textContent = item.fullAddress;
-      li.onclick = () => {
-        currentLat = item.lat;
-        currentLon = item.lon;
-        marker.setLatLng([item.lat, item.lon]);
-        map.flyTo([item.lat, item.lon], 15, { duration: 2 });
-        const streetViewUrl = `https://www.google.com/maps?q=&layer=c&cbll=${item.lat},${item.lon}&cbp=11,0,0,0,0&output=svembed`;
-        document.getElementById("streetview").src = streetViewUrl;
-        document.getElementById("coords").innerText = `Latitude: ${item.lat}, Longitude: ${item.lon}`;
-      };
-      list.appendChild(li);
-    });
-  }
-
   // Directions button
   document.getElementById("directionsBtn").onclick = () => {
+    if (!accessGranted) {
+      alert("You must enter the correct PIN first.");
+      return;
+    }
     if (!currentLat || !currentLon) {
       alert("Search for an address first!");
       return;
@@ -251,8 +103,4 @@
     const url = `https://www.google.com/maps/dir/?api=1&destination=${currentLat},${currentLon}`;
     window.open(url, "_blank");
   }
-
 </script>
-
-</body>
-</html>
